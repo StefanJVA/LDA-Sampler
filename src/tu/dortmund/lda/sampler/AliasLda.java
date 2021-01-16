@@ -21,7 +21,7 @@ public class AliasLda extends GibbsLda {
 
         this.aliasTables = new AliasTable[vocabularySize];
         for (int w = 0; w < vocabularySize; w++) {
-            aliasTables[w] = new AliasTable(numNormalTopics);
+            aliasTables[w] = new AliasTable(numTopics);
             updateAliasTable(w);
         }
 
@@ -29,7 +29,7 @@ public class AliasLda extends GibbsLda {
         nonzeroDocTopic = new ArrayList[documents.length];
         for (int document = 0; document < documents.length; document++) {
             ArrayList<Integer> nonzeroList = new ArrayList<Integer>();
-            for (int topic = 0; topic < numNormalTopics; topic++) {
+            for (int topic = 0; topic < numTopics; topic++) {
                 int count = (int)(matDocTopic[document][topic]+0.1);
                 if(count > 0 && !nonzeroList.contains(topic)) {
                     nonzeroList.add(topic);
@@ -43,7 +43,7 @@ public class AliasLda extends GibbsLda {
         AliasTable at = aliasTables[word];
         at.resetSampleCount();
         double psum = 0.0;
-        for (int t = 0; t < numNormalTopics; t++) {
+        for (int t = 0; t < numTopics; t++) {
             double tmp = alpha[t] * (matTopicWord[t][word] + beta[word]) / (vecTopic[t] + betaSum);
             at.getUnnormalizedProbability()[t] = tmp;
             psum += tmp;
@@ -54,7 +54,7 @@ public class AliasLda extends GibbsLda {
 
     @Override
     protected void fullCorpusSweep() {
-        double[] pdw = new double[numNormalTopics];
+        double[] pdw = new double[numTopics];
 
         for (int document = 0; document < documents.length; document++) {
             for (int wi = 0; wi < documents[document].length; wi++) {
@@ -84,7 +84,7 @@ public class AliasLda extends GibbsLda {
                         newTopic = nonzeroTopics.get(index);
                     }
                     else {
-                        if(wordTable.getSampleCount() >= numNormalTopics) {
+                        if(wordTable.getSampleCount() >= numTopics) {
                             updateAliasTable(word);
                         }
                         newTopic = wordTable.sample(this.random);

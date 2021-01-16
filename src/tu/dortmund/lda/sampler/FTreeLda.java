@@ -3,7 +3,6 @@ package tu.dortmund.lda.sampler;
 import tu.dortmund.lda.data_structure.FPlusTree;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 
 public class FTreeLda extends GibbsLda {
 
@@ -40,7 +39,7 @@ public class FTreeLda extends GibbsLda {
         nonzeroDocTopic = new ArrayList[documents.length];
         for (int document = 0; document < documents.length; document++) {
             ArrayList<Integer> nonzeroList = new ArrayList<Integer>();
-            for (int topic = 0; topic < numNormalTopics; topic++) {
+            for (int topic = 0; topic < numTopics; topic++) {
                 int count = (int)(matDocTopic[document][topic]+0.1);
                 if(count > 0 && !nonzeroList.contains(topic)) {
                     nonzeroList.add(topic);
@@ -65,12 +64,12 @@ public class FTreeLda extends GibbsLda {
 
     @Override
     protected void fullCorpusSweep() {
-        double[] p = new double[numNormalTopics];
-        double[] q = new double[numNormalTopics];
-        double[] q2 = new double[numNormalTopics];
+        double[] p = new double[numTopics];
+        double[] q = new double[numTopics];
+        double[] q2 = new double[numTopics];
 
         for (int word = 0; word < wordOccurences.length; word++) {
-            for (int topic = 0; topic < numNormalTopics; topic++) {
+            for (int topic = 0; topic < numTopics; topic++) {
                 q2[topic] = (matTopicWord[topic][word] + beta[word]) / (vecTopic[topic] + betaSum);
                 q[topic] = alpha[topic] * q2[topic];
             }

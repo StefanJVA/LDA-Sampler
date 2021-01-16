@@ -20,8 +20,8 @@ public class SparseLda extends GibbsLda {
         // sort topics in descending order by how often the assign the word
         nonzeroTopicTerm = new SortedTopicList[vocabularySize];
         for (int w = 0; w < vocabularySize; w++) {
-            SortedTopicList list = new SortedTopicList(numTotalTopics);
-            for (int t = 0; t < numTotalTopics; t++) {
+            SortedTopicList list = new SortedTopicList(numTopics);
+            for (int t = 0; t < numTopics; t++) {
                 if(matTopicWord[t][w] > 0.0){
                     list.addTopic(t, (int)(matTopicWord[t][w]+0.1));
                 }
@@ -31,9 +31,9 @@ public class SparseLda extends GibbsLda {
         }
 
         // compute the ssum bucket and the part of qDocSpecific that is not document specific
-        qDoc = new double[numTotalTopics];
+        qDoc = new double[numTopics];
         ssum = 0.0;
-        for (int t = 0; t < numTotalTopics; t++) {
+        for (int t = 0; t < numTopics; t++) {
             qDoc[t] = alpha[t] / (vecTopic[t] + betaSum);
             ssum += qDoc[t];
         }
@@ -41,12 +41,12 @@ public class SparseLda extends GibbsLda {
 
     @Override
     protected void fullCorpusSweep() {
-        double[] q = new double[numNormalTopics];
+        double[] q = new double[numTopics];
 
         for (int document = 0; document < documents.length; document++) {
             // compute document specific bucket rsum and add document specific information to qDocSpecific
             double rsum = 0.0;
-            for (int t = 0; t < numNormalTopics; t++) {
+            for (int t = 0; t < numTopics; t++) {
                 double tmp = matDocTopic[document][t] / (vecTopic[t] + betaSum);
                 rsum += tmp;
                 qDoc[t] += tmp;
@@ -90,7 +90,7 @@ public class SparseLda extends GibbsLda {
                 double u = random.nextDouble() * normalizingConstant;
                 if(u < ssum) {
                     u /= beta[word];
-                    for (int t = 0; t < numNormalTopics; t++) {
+                    for (int t = 0; t < numTopics; t++) {
                         u -= alpha[t] / (vecTopic[t] + betaSum);
                         if(u <= 0){
                             topic = t;
@@ -101,7 +101,7 @@ public class SparseLda extends GibbsLda {
                 else if(u < (ssum + rsum)) {
                     u -= ssum;
                     u /= beta[word];
-                    for (int t = 0; t < numNormalTopics; t++) {
+                    for (int t = 0; t < numTopics; t++) {
                         u -= matDocTopic[document][t] / (vecTopic[t] + betaSum);
                         if(u <= 0){
                             topic = t;
@@ -146,7 +146,7 @@ public class SparseLda extends GibbsLda {
             }
 
             // remove document specific information from qDocSpecific
-            for (int t = 0; t < numNormalTopics; t++) {
+            for (int t = 0; t < numTopics; t++) {
                 qDoc[t] -= matDocTopic[document][t] / (vecTopic[t] + betaSum);
             }
         }

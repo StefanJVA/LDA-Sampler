@@ -1,70 +1,115 @@
 package tu.dortmund.lda.sampler;
 
+import java.util.Arrays;
+import java.util.SplittableRandom;
+
 import tu.dortmund.lda.LdaModel;
 
-import java.text.DecimalFormat;
-import java.util.*;
-
+/**
+ * The normal Gibbs Sampling algorithm
+ */
 public class GibbsLda implements LdaModel {
 
     protected final int vocabularySize;
-    protected int[][] documents;
+    protected final int numTopics;
+
     protected double[] alpha;
     protected double alphaSum;
     protected double[] beta;
     protected double betaSum;
-    protected final int numNormalTopics;
-    protected int numTotalTopics;
 
+    /**
+     * All existing documents. A single document is represented as an integer array.
+     * Each term in the vocabulary is represented by a unique integer. If for
+     * example a document is [1,1,2,3] this indicates that the document contains 4
+     * word tokes, where the first word appears twice in the document. This
+     * representation is therefore NOT a Bag Of Words (BOW) format.
+     */
+    protected int[][] documents;
+
+    /**
+     * Holds the topic assignment for each word token in each document. It therefore
+     * has the same dimensions as the documents 2d array.
+     */
     protected int[][] matZ;
+
+    /**
+     * Count matrix that holds the number of times a word is assinged to a topic
+     * throughout the whole corpus. For example matTopicWord[i][j] tells how often
+     * word j is assigned to topic i. The matrix dimensions are therefore: number of
+     * topics X vocabulary size.
+     */
     protected float[][] matTopicWord;
+
+    /**
+     * Count matrix that holds the number of times a topic is used inside a
+     * document. For example matDocTopic[i][j] tells how often a word token inside
+     * document i is assigned to topic j. The matrix dimensions are therefore:
+     * number of documents X number of topics.
+     */
     protected float[][] matDocTopic;
+
+    /**
+     * Count vector that holds the total assignments of each topic throughout the
+     * whole corpus.
+     */
     protected float[] vecTopic;
 
+    /**
+     * Total number of word tokens throughout the whole corpus.
+     */
     protected int numTokens;
 
     protected SplittableRandom random;
 
-    public GibbsLda(int[][] documents, int vocabularySize, int numNormalTopics){
+    /**
+     * Constructor. Sets some default values for alpha and beta prior.
+     * 
+     * @param documents      The documents decoded as integers.
+     * @param vocabularySize Size of the vocabulary.
+     * @param numTopics      Number of topics that should be learned.
+     */
+    public GibbsLda(int[][] documents, int vocabularySize, int numTopics) {
         this.documents = documents;
         this.vocabularySize = vocabularySize;
-        this.numNormalTopics = numNormalTopics;
-        this.numTotalTopics = numNormalTopics;
+        this.numTopics = numTopics;
 
-        //set some default values for alpha and beta
-        this.alpha = new double[numNormalTopics];
-        for (int i = 0; i < alpha.length; i++) {
-            this.alpha[i] = 50.0 / (double) numNormalTopics;
-        }
-        this.alphaSum = Arrays.stream(alpha).sum();
+        // set some default values for alpha (50 / numTopics)
+        this.alpha = new double[numTopics];
+        Arrays.fill(this.alpha, 50.0 / (double) numTopics);
+        this.alphaSum = Arrays.stream(this.alpha).sum();
 
+        // set some default values for beta (0.01)
         this.beta = new double[vocabularySize];
-        for (int i = 0; i < beta.length; i++) {
-            this.beta[i] = 0.01;
-        }
-        this.betaSum = Arrays.stream(beta).sum();
+        Arrays.fill(this.beta, 0.01);
+        this.betaSum = Arrays.stream(this.beta).sum();
 
-
-        this.random = new SplittableRandom(42l);
+        this.random = new SplittableRandom();
     }
 
+    /**
+     * @inheritDoc
+     */
     @Override
     public void initialize() {
         this.initializeCountMatrices();
     }
 
-    protected void initializeCountMatrices(){
-        matTopicWord = new float[numTotalTopics][vocabularySize];
-        matDocTopic = new float[documents.length][numTotalTopics];
-        vecTopic = new float[numTotalTopics];
+    /**
+     * Initializes the count matrices. This may allocate a lot of main memory.
+     */
+    protected void initializeCountMatrices() {
+        matTopicWord = new float[numTopics][vocabularySize];
+        matDocTopic = new float[documents.length][numTopics];
+        vecTopic = new float[numTopics];
         matZ = new int[documents.length][];
         numTokens = 0;
 
-        for(int document = 0; document < documents.length; document++){
+        for (int document = 0; document < documents.length; document++) {
             matZ[document] = new int[documents[document].length];
-            for (int token = 0; token < documents[document].length; token++){
+            for (int token = 0; token < documents[document].length; token++) {
                 int word = documents[document][token];
-                int topic = sampleTopicForWord();
+                int topic = random.nextInt(numTopics); // random topic assignment
                 matZ[document][token] = topic;
                 matTopicWord[topic][word]++;
                 matDocTopic[document][topic]++;
@@ -74,30 +119,22 @@ public class GibbsLda implements LdaModel {
         }
     }
 
-    protected int[] computeWordCount() {
-        int[] vecWordCount = new int[vocabularySize];
-        for(int document = 0; document < documents.length; document++){
-            for (int token = 0; token < documents[document].length; token++){
-                vecWordCount[documents[document][token]]++;
-            }
-        }
-        return vecWordCount;
-    }
-
-    protected int sampleTopicForWord() {
-        return random.nextInt(numTotalTopics);
-    }
-
+    /**
+     * @inheritDoc
+     */
     @Override
-    public void run(int iterations){
+    public void run(int iterations) {
         for (int i = 0; i < iterations; i++) {
             fullCorpusSweep();
-            //showProgressInConsole((int)((double)i / (double)iterations * 100.0));
         }
     }
 
+    /**
+     * The Gibbs sampling algorithm which iterates over every word token in every
+     * document ones.
+     */
     protected void fullCorpusSweep() {
-        double[] p = new double[numTotalTopics];
+        double[] cumulativeProbabilities = new double[numTopics];
 
         for (int document = 0; document < matZ.length; document++) {
             for (int token = 0; token < matZ[document].length; token++) {
@@ -106,15 +143,16 @@ public class GibbsLda implements LdaModel {
 
                 decrementCountMatrices(document, word, topic);
 
-                double psum = 0.0;
-                for (int topicI = 0; topicI < numNormalTopics; topicI++) {
-                    double propOfTopicI = matDocTopic[document][topicI] + alpha[topicI];
-                    double propOfWordInTopicI = (matTopicWord[topicI][word] + beta[word]) / (vecTopic[topicI] + betaSum);
-                    psum += propOfTopicI * propOfWordInTopicI;
-                    p[topicI] = psum;
+                double probabilitySum = 0.0;
+                for (int topicI = 0; topicI < numTopics; topicI++) {
+                    double probabilityOfTopicI = matDocTopic[document][topicI] + alpha[topicI];
+                    double probabilityOfWordInTopicI = (matTopicWord[topicI][word] + beta[word])
+                            / (vecTopic[topicI] + betaSum);
+                    probabilitySum += probabilityOfTopicI * probabilityOfWordInTopicI;
+                    cumulativeProbabilities[topicI] = probabilitySum;
                 }
-                double u = random.nextDouble() * psum;
-                topic = lowerBound(p, p.length, u);
+                double u = random.nextDouble() * probabilitySum;
+                topic = lowerBound(cumulativeProbabilities, cumulativeProbabilities.length, u);
 
                 incrementCountMatrices(document, word, topic);
 
@@ -123,92 +161,61 @@ public class GibbsLda implements LdaModel {
         }
     }
 
-    protected int sampleUnnormalizedDistribution(double[] p) {
-        //cumulative method
-        for (int i = 1; i < p.length; i++) {
-            p[i] += p[i - 1];
-        }
-
-        double u = random.nextDouble() * p[p.length - 1];
-        int result = 0;
-        for (result = 0; result < p.length; result++) {
-            if (u < p[result])
-                break;
-        }
-
-        return result;
-    }
-
-    protected void decrementCountMatrices(int document, int word, int topic){
+    /**
+     * Decrements all count matrices by one for the given indices
+     * 
+     * @param document Document index
+     * @param word     Word index
+     * @param topic    Topic index
+     */
+    protected void decrementCountMatrices(int document, int word, int topic) {
         matTopicWord[topic][word]--;
         matDocTopic[document][topic]--;
         vecTopic[topic]--;
     }
 
-    protected void incrementCountMatrices(int document, int word, int topic){
+    /**
+     * Increments all count matrices by one for the given indices
+     * 
+     * @param document Document index
+     * @param word     Word index
+     * @param topic    Topic index
+     */
+    protected void incrementCountMatrices(int document, int word, int topic) {
         matTopicWord[topic][word]++;
         matDocTopic[document][topic]++;
         vecTopic[topic]++;
     }
 
+    /**
+     * Computes the current LogLikelihood of the model. This method takes some
+     * computing resources!
+     * 
+     * @return LogLikelihood of the model.
+     */
     @Override
     public double getLogLikelihood() {
         return getLogLikelihoodMallet();
     }
 
-    public double getLogLikelihoodFull() {
-        double[][] theta = this.getTheta();
-        double[][] phi = this.getPhi();
-
-        double logLikelihood = 0.0;
-        for (int d = 0; d < documents.length; d++) {
-            for (int wi = 0; wi < documents[d].length; wi++) {
-                double wordProp = 0.0;
-                for (int t = 0; t < numTotalTopics; t++) {
-                   wordProp += theta[d][t] * phi[t][documents[d][wi]];
-                }
-                logLikelihood += Math.log(wordProp);
-            }
-        }
-
-        return logLikelihood;
-    }
-
-    public double getLogLikelihoodDMLC() {
-        double[][] theta = this.getTheta();
-        double[][] phi = this.getPhi();
-
-        int num_tokens = 0;
-        double sum = 0.0;
-        for (int d = 0; d < documents.length; d++) {
-            double dsum = 0.0;
-            num_tokens += documents.length;
-            for (int wi = 0; wi < documents[d].length; wi++) {
-                int word = documents[d][wi];
-                double wsum = 0.0;
-                for (int t = 0; t < numTotalTopics; t++) {
-                    wsum += (theta[d][t] ) * phi[t][word];
-                }
-                dsum += Math.log(wsum);
-            }
-            sum += dsum - (documents.length * Math.log(documents.length + numTotalTopics));
-        }
-
-        return sum / num_tokens;
-    }
-
+    /**
+     * Compute the LogLikelihood of the model as suggested by the Mallet LDA
+     * algorithm.
+     * 
+     * @return LogLikelihood of the model.
+     */
     public double getLogLikelihoodMallet() {
         double logLikelihood = 0.0;
 
         // document topic
-        double[] logGammaAlpha = new double[numTotalTopics];
-        for (int topic = 0; topic < numTotalTopics; topic++) {
+        double[] logGammaAlpha = new double[numTopics];
+        for (int topic = 0; topic < numTopics; topic++) {
             logGammaAlpha[topic] = logGammaStirling(alpha[topic]);
         }
         for (int document = 0; document < documents.length; document++) {
-            for (int topic = 0; topic < numTotalTopics; topic++) {
+            for (int topic = 0; topic < numTopics; topic++) {
                 float count = matDocTopic[document][topic];
-                if (count > 0.1){
+                if (count > 0.1) {
                     logLikelihood += logGammaStirling(alpha[topic] + count) - logGammaAlpha[topic];
                 }
             }
@@ -216,33 +223,33 @@ public class GibbsLda implements LdaModel {
         }
         logLikelihood += documents.length * logGammaStirling(alphaSum);
 
-
         // topic term
         double[] logGammaBeta = new double[vocabularySize];
         for (int term = 0; term < vocabularySize; term++) {
             logGammaBeta[term] = logGammaStirling(beta[term]);
         }
-        for (int topic = 0; topic < numTotalTopics; topic++) {
+        for (int topic = 0; topic < numTopics; topic++) {
             for (int term = 0; term < vocabularySize; term++) {
                 float count = matTopicWord[topic][term];
-                if(count > 0.1){
+                if (count > 0.1) {
                     logLikelihood += logGammaStirling(beta[term] + count) - logGammaBeta[term];
                 }
             }
             logLikelihood -= logGammaStirling(betaSum + vecTopic[topic]);
         }
-        logLikelihood += numTotalTopics * logGammaStirling(betaSum);
+        logLikelihood += numTopics * logGammaStirling(betaSum);
 
         return logLikelihood;
     }
 
     public static final double HALF_LOG_TWO_PI = Math.log(2 * Math.PI) / 2;
 
-    /** Use a fifth order Stirling's approximation.
-     * Copied from mallet
-     *
-     *	@param z Note that Stirling's approximation is increasingly unstable as z approaches 0.
-     *          	If z is less than 2, we shift it up, calculate the approximation, and then shift the answer back down.
+    /**
+     * Use a fifth order Stirling's approximation. Copied from Mallet LDA algorithm.
+     * 
+     * @param z Note that Stirling's approximation is increasingly unstable as z
+     *          approaches 0. If z is less than 2, we shift it up, calculate the
+     *          approximation, and then shift the answer back down.
      */
     public static double logGammaStirling(double z) {
         int shift = 0;
@@ -251,8 +258,8 @@ public class GibbsLda implements LdaModel {
             shift++;
         }
 
-        double result = HALF_LOG_TWO_PI + (z - 0.5) * Math.log(z) - z +
-                1/(12 * z) - 1 / (360 * z * z * z) + 1 / (1260 * z * z * z * z * z);
+        double result = HALF_LOG_TWO_PI + (z - 0.5) * Math.log(z) - z + 1 / (12 * z) - 1 / (360 * z * z * z)
+                + 1 / (1260 * z * z * z * z * z);
 
         while (shift > 0) {
             shift--;
@@ -263,95 +270,17 @@ public class GibbsLda implements LdaModel {
         return result;
     }
 
-    @Override
-    public double[][] getTheta() {
-        double[][] theta = new double[documents.length][numTotalTopics];
-
-        for (int document = 0; document < documents.length; document++) {
-            for (int topic = 0; topic < numTotalTopics; topic++) {
-//                theta[document][topic] = (matDocTopic[document][topic] + alpha[topic]) / (documents[document].length + numTotalTopics * alpha);
-                theta[document][topic] = (matDocTopic[document][topic] + alpha[topic]) / (documents[document].length + alphaSum);
-            }
-        }
-
-        return theta;
-    }
-
-    @Override
-    public double[][] getPhi() {
-        double[][] phi = new double[numTotalTopics][vocabularySize];
-
-        for (int topic = 0; topic < numTotalTopics; topic++) {
-            for (int word = 0; word < vocabularySize; word++) {
-                phi[topic][word] = (matTopicWord[topic][word] + beta[word]) / (vecTopic[topic] + betaSum);
-            }
-        }
-
-        return phi;
-    }
-
-    @Override
-    public int[][] getMatZ() {
-        return this.matZ;
-    }
-
-    protected int[] computeTermDocumentFrequency(){
-        int[] tdf = new int[vocabularySize];
-        for (int document = 0; document < documents.length; document++) {
-            int[] distinctWords = java.util.stream.IntStream.of(documents[document]).distinct().toArray();
-            for (int word : distinctWords) {
-                tdf[word]++;
-            }
-        }
-        return tdf;
-    }
-
-    protected int[][] computeBagOfWords(){
-        int[][] bow = new int[documents.length][vocabularySize];
-        for (int d = 0; d < documents.length; d++) {
-            for (int wi = 0; wi < documents[d].length; wi++) {
-                int word = documents[d][wi];
-                bow[d][word]++;
-            }
-        }
-        return bow;
-    }
-
-    @Override
-    public void setSeed(long seed) {
-        this.random = new SplittableRandom(seed);
-    }
-
-    @Override
-    public void setAlpha(double[] alpha) {
-        this.alpha = alpha;
-        this.alphaSum = Arrays.stream(alpha).sum();
-    }
-
-    @Override
-    public void setBeta(double[] beta){
-        this.beta = beta;
-        this.betaSum = Arrays.stream(beta).sum();
-    }
-
-    @Override
-    public void setAlpha(double alphaSymmetric) {
-        this.alphaSum = 0.0;
-        for (int i = 0; i < this.alpha.length; i++) {
-            this.alpha[i] = alphaSymmetric;
-            this.alphaSum += alphaSymmetric;
-        }
-    }
-
-    @Override
-    public void setBeta(double betaSymmetric){
-        this.betaSum = 0.0;
-        for (int i = 0; i < this.beta.length; i++) {
-            this.beta[i] = betaSymmetric;
-            this.betaSum += betaSymmetric;
-        }
-    }
-
+    /**
+     * Simple lower bound algorithm, which finds the lower bound in log(n)
+     * complexity.
+     * 
+     * @param p      Sorted array (increasing order) of values for which the lower
+     *               bound should be found.
+     * @param length Values in p that appear after the length are ignored. The lower
+     *               bound therefore needs to be between 0 and length.
+     * @param u      The lower bound.
+     * @return Index of the lower bound.
+     */
     protected int lowerBound(double[] p, int length, double u) {
         int low = 0;
         int high = length;
@@ -366,52 +295,49 @@ public class GibbsLda implements LdaModel {
         return low;
     }
 
-    public void removeWords(ArrayList<Integer> removalWords) {
+    /**
+     * Returns the document topic distributions theta. Every row is a normalized
+     * probability distribution that contains the probabilities for each topic
+     * inside the corresponding document. For example if half of all word tokens in
+     * document i are assigned to topic j, theta[i][j] contains the value 0.5 . This
+     * method takes some computing resources!
+     */
+    @Override
+    public double[][] getTheta() {
+        double[][] theta = new double[documents.length][numTopics];
+
         for (int document = 0; document < documents.length; document++) {
-//            List<Integer> newDocument = Arrays.stream(documents[document]).boxed().collect(Collectors.toList());
-//            List<Integer> newTopicAssignments = Arrays.stream(z[document]).boxed().collect(Collectors.toList());
-//            //newDocument.removeIf()
-//
-//            ListIterator<Integer> iter = newDocument.listIterator();
-//            while(iter.hasNext()){
-//                int word = iter.next();
-//                if(removalWords.contains(word)){
-//                    iter.remove();
-//                }
-//            }
-            ArrayList<Integer> removedIndices = new ArrayList<>();
-            for (int wi = 0; wi < documents[document].length; wi++) {
-                int topic = matZ[document][wi];
-                int word = documents[document][wi];
-                if(removalWords.contains(word)){
-                    decrementCountMatrices(document, word, topic);
-                    removedIndices.add(wi);
-                }
+            for (int topic = 0; topic < numTopics; topic++) {
+                theta[document][topic] = (matDocTopic[document][topic] + alpha[topic])
+                        / (documents[document].length + alphaSum);
             }
-
-            int index = 0;
-            int[] newDocument = new int[documents[document].length - removedIndices.size()];
-            int[] newTopicAssignments = new int[documents[document].length - removedIndices.size()];
-            for (int wi = 0; wi < documents[document].length; wi++) {
-                if(!removedIndices.contains(wi)){
-                    newDocument[index] = documents[document][wi];
-                    newTopicAssignments[index] = matZ[document][wi];
-                    index++;
-                }
-            }
-
-            documents[document] = newDocument;
-            matZ[document] = newTopicAssignments;
         }
+
+        return theta;
+    }
+
+    /**
+     * Returns the topic term distribution phi. Every row is a normalized
+     * probability distribution that contains the word probabilities of the
+     * corresponding topic. For example if half of all word tokens that are assigned
+     * to topic i contain the term j, phi[i][j] contains the value 0.5 .
+     */
+    @Override
+    public double[][] getPhi() {
+        double[][] phi = new double[numTopics][vocabularySize];
+
+        for (int topic = 0; topic < numTopics; topic++) {
+            for (int word = 0; word < vocabularySize; word++) {
+                phi[topic][word] = (matTopicWord[topic][word] + beta[word]) / (vecTopic[topic] + betaSum);
+            }
+        }
+
+        return phi;
     }
 
     @Override
-    public int[] getAssignmentsPerTopic() {
-        int[] totalAssis = new int[vecTopic.length];
-        for (int i = 0; i < vecTopic.length; i++) {
-            totalAssis[i] = (int)(vecTopic[i]+0.1);
-        }
-        return totalAssis;
+    public int[][] getMatZ() {
+        return this.matZ;
     }
 
     @Override
@@ -430,17 +356,59 @@ public class GibbsLda implements LdaModel {
     }
 
     @Override
-    public int getNumNormalTopics() {
-        return numNormalTopics;
-    }
-
-    @Override
-    public int getNumTotalTopics() {
-        return numTotalTopics;
+    public int getNumTopics() {
+        return numTopics;
     }
 
     @Override
     public int getVocabularySize() {
         return vocabularySize;
+    }
+
+    @Override
+    public void setSeed(long seed) {
+        this.random = new SplittableRandom(seed);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    @Override
+    public void setAlpha(double[] alpha) {
+        this.alpha = alpha;
+        this.alphaSum = Arrays.stream(alpha).sum();
+    }
+
+    /**
+     * @inheritDoc
+     */
+    @Override
+    public void setBeta(double[] beta) {
+        this.beta = beta;
+        this.betaSum = Arrays.stream(beta).sum();
+    }
+
+    /**
+     * @inheritDoc
+     */
+    @Override
+    public void setAlpha(double alphaSymmetric) {
+        this.alphaSum = 0.0;
+        for (int i = 0; i < this.alpha.length; i++) {
+            this.alpha[i] = alphaSymmetric;
+            this.alphaSum += alphaSymmetric;
+        }
+    }
+
+    /**
+     * @inheritDoc
+     */
+    @Override
+    public void setBeta(double betaSymmetric) {
+        this.betaSum = 0.0;
+        for (int i = 0; i < this.beta.length; i++) {
+            this.beta[i] = betaSymmetric;
+            this.betaSum += betaSymmetric;
+        }
     }
 }
