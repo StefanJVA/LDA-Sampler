@@ -25,13 +25,12 @@ public class AliasLda extends GibbsLda {
             updateAliasTable(w);
         }
 
-        // init nonzero documents data structure
+        // build up nonzero documents data structure
         nonzeroDocTopic = new ArrayList[documents.length];
         for (int document = 0; document < documents.length; document++) {
             ArrayList<Integer> nonzeroList = new ArrayList<Integer>();
             for (int topic = 0; topic < numTopics; topic++) {
-                int count = (int)(matDocTopic[document][topic]+0.1);
-                if(count > 0 && !nonzeroList.contains(topic)) {
+                if(matDocTopic[document][topic] > 0 && !nonzeroList.contains(topic)) {
                     nonzeroList.add(topic);
                 }
             }
@@ -91,17 +90,16 @@ public class AliasLda extends GibbsLda {
                     }
 
                     if(newTopic != topic) {
-                        double newTopicProp = (matTopicWord[newTopic][word] + beta[word]) / (vecTopic[newTopic] + betaSum);
-                        double newFullProp = (matDocTopic[document][newTopic] + alpha[topic]) * newTopicProp;
-                        double newPdw = matDocTopic[document][newTopic] * newTopicProp;
+                        double newTopicProbability = (matTopicWord[newTopic][word] + beta[word]) / (vecTopic[newTopic] + betaSum);
+                        double newFullProbability = (matDocTopic[document][newTopic] + alpha[topic]) * newTopicProbability;
+                        double newPdw = matDocTopic[document][newTopic] * newTopicProbability;
 
-                        double oldTopicProp = (matTopicWord[topic][word] + beta[word]) / (vecTopic[topic] + betaSum);
-                        double oldFullProp = (matDocTopic[document][topic] + alpha[topic]) * oldTopicProp;
-                        double oldPdw = matDocTopic[document][topic] * oldTopicProp;
+                        double oldTopicProbability = (matTopicWord[topic][word] + beta[word]) / (vecTopic[topic] + betaSum);
+                        double oldFullProbability = (matDocTopic[document][topic] + alpha[topic]) * oldTopicProbability;
+                        double oldPdw = matDocTopic[document][topic] * oldTopicProbability;
 
                         double[] qw = wordTable.getUnnormalizedProbability();
-                        double acceptance = (newFullProp * (oldPdw + qw[topic])) /
-                                (oldFullProp * (newPdw + qw[newTopic]));
+                        double acceptance = (newFullProbability * (oldPdw + qw[topic])) / (oldFullProbability * (newPdw + qw[newTopic]));
 
                         if(random.nextDouble() < acceptance) {
                             topic = newTopic;

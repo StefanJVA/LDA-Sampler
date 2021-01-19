@@ -23,7 +23,7 @@ public class SparseLda extends GibbsLda {
             SortedTopicList list = new SortedTopicList(numTopics);
             for (int t = 0; t < numTopics; t++) {
                 if(matTopicWord[t][w] > 0.0){
-                    list.addTopic(t, (int)(matTopicWord[t][w]+0.1));
+                    list.addTopic(t, matTopicWord[t][w]);
                 }
             }
             list.sort();

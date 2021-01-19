@@ -18,18 +18,19 @@ public class Main {
      * @param args No arguments necessary.
      */
     public static void main(String[] args) {
-        int vocabularySize = 1000;
-        int numTopics = 100;
-        int[][] documents = generateRandomDocuments(100, 1000, vocabularySize, 42);
+        int vocabularySize = 5000;
+        int numTopics = 200;
+        int[][] documents = generateRandomDocuments(500, 500, vocabularySize, 42);
 
         ArrayList<LdaModel> ldaSamplers = new ArrayList<LdaModel>();
         ldaSamplers.add(new GibbsLda(documents, vocabularySize, numTopics));
         ldaSamplers.add(new SparseLda(documents, vocabularySize, numTopics));
         ldaSamplers.add(new AliasLda(documents, vocabularySize, numTopics));
+        ldaSamplers.add(new LightLda(documents, vocabularySize, numTopics));
         ldaSamplers.add(new FTreeLda(documents, vocabularySize, numTopics));
 
         for (LdaModel ldaSampler : ldaSamplers) {
-            testLdaSampler(ldaSampler, 200, 100);
+            testLdaSampler(ldaSampler, 100, 20);
         }
     }
 

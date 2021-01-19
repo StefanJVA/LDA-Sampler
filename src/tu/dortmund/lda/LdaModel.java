@@ -8,19 +8,27 @@ public interface LdaModel {
     public void initialize();
 
     /**
-     * Let the model run its sampling algorithm.
-     * One iteration is one full corpus sweep.
+     * Let the model run its sampling algorithm. One iteration is one full corpus
+     * sweep.
+     * 
      * @param iterations Number of iterations that should be executed.
      */
     public void run(int iterations);
 
     public double[][] getTheta();
+
     public double[][] getPhi();
+
     public int[][] getMatZ();
+
     public int getNumTopics();
+
     public int getNumTokens();
+
     public int getVocabularySize();
+
     public double[] getAlpha();
+
     public double[] getBeta();
 
     public double getLogLikelihood();
@@ -29,6 +37,7 @@ public interface LdaModel {
 
     /**
      * Set a asymmetric alpha prior.
+     * 
      * @param alpha Array of prior values. The index of each value correspond the
      *              topic number. Array length should therefore be equal to the
      *              number of topics.
@@ -37,12 +46,14 @@ public interface LdaModel {
 
     /**
      * Set a symmetric alpha prior.
+     * 
      * @param alpha Alpha prior value.
      */
     public void setAlpha(double alpha);
 
     /**
      * Set a asymmetric beta prior.
+     * 
      * @param alpha Array of prior values. The index of each value correspond the
      *              term number. Array length should therefore be equal to the
      *              vocabulary size.
@@ -51,6 +62,7 @@ public interface LdaModel {
 
     /**
      * Set a symmetric beta prior.
+     * 
      * @param alpha Beta prior value.
      */
     public void setBeta(double beta);

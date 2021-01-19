@@ -39,7 +39,7 @@ public class GibbsLda implements LdaModel {
      * word j is assigned to topic i. The matrix dimensions are therefore: number of
      * topics X vocabulary size.
      */
-    protected float[][] matTopicWord;
+    protected int[][] matTopicWord;
 
     /**
      * Count matrix that holds the number of times a topic is used inside a
@@ -47,13 +47,13 @@ public class GibbsLda implements LdaModel {
      * document i is assigned to topic j. The matrix dimensions are therefore:
      * number of documents X number of topics.
      */
-    protected float[][] matDocTopic;
+    protected int[][] matDocTopic;
 
     /**
      * Count vector that holds the total assignments of each topic throughout the
      * whole corpus.
      */
-    protected float[] vecTopic;
+    protected int[] vecTopic;
 
     /**
      * Total number of word tokens throughout the whole corpus.
@@ -87,9 +87,6 @@ public class GibbsLda implements LdaModel {
         this.random = new SplittableRandom();
     }
 
-    /**
-     * @inheritDoc
-     */
     @Override
     public void initialize() {
         this.initializeCountMatrices();
@@ -99,9 +96,9 @@ public class GibbsLda implements LdaModel {
      * Initializes the count matrices. This may allocate a lot of main memory.
      */
     protected void initializeCountMatrices() {
-        matTopicWord = new float[numTopics][vocabularySize];
-        matDocTopic = new float[documents.length][numTopics];
-        vecTopic = new float[numTopics];
+        matTopicWord = new int[numTopics][vocabularySize];
+        matDocTopic = new int[documents.length][numTopics];
+        vecTopic = new int[numTopics];
         matZ = new int[documents.length][];
         numTokens = 0;
 
@@ -119,9 +116,6 @@ public class GibbsLda implements LdaModel {
         }
     }
 
-    /**
-     * @inheritDoc
-     */
     @Override
     public void run(int iterations) {
         for (int i = 0; i < iterations; i++) {
@@ -370,27 +364,18 @@ public class GibbsLda implements LdaModel {
         this.random = new SplittableRandom(seed);
     }
 
-    /**
-     * @inheritDoc
-     */
     @Override
     public void setAlpha(double[] alpha) {
         this.alpha = alpha;
         this.alphaSum = Arrays.stream(alpha).sum();
     }
 
-    /**
-     * @inheritDoc
-     */
     @Override
     public void setBeta(double[] beta) {
         this.beta = beta;
         this.betaSum = Arrays.stream(beta).sum();
     }
 
-    /**
-     * @inheritDoc
-     */
     @Override
     public void setAlpha(double alphaSymmetric) {
         this.alphaSum = 0.0;
@@ -400,9 +385,6 @@ public class GibbsLda implements LdaModel {
         }
     }
 
-    /**
-     * @inheritDoc
-     */
     @Override
     public void setBeta(double betaSymmetric) {
         this.betaSum = 0.0;

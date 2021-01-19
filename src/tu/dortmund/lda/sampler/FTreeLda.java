@@ -35,19 +35,25 @@ public class FTreeLda extends GibbsLda {
     public void initialize() {
         super.initializeCountMatrices();
 
-        // init nonzero documents data structure
+        // build up nonzero documents data structure
         nonzeroDocTopic = new ArrayList[documents.length];
         for (int document = 0; document < documents.length; document++) {
             ArrayList<Integer> nonzeroList = new ArrayList<Integer>();
             for (int topic = 0; topic < numTopics; topic++) {
-                int count = (int)(matDocTopic[document][topic]+0.1);
-                if(count > 0 && !nonzeroList.contains(topic)) {
+                if(matDocTopic[document][topic] > 0 && !nonzeroList.contains(topic)) {
                     nonzeroList.add(topic);
                 }
             }
             nonzeroDocTopic[document] = nonzeroList;
         }
 
+        /*
+         * Build up a data structure that contains the occurences of each term in the
+         * corpus. This makes it possible to iterate through the corpus term by term
+         * instead of word token by word token. The data structure consumes a lot of
+         * memory and could be avoided if the corpus representation would be different.
+         * However for the sake of simplicity this data structure is used.
+         */
         wordOccurences = new ArrayList[vocabularySize];
         for (int word = 0; word < vocabularySize; word++) {
             wordOccurences[word] = new ArrayList<DocToken>();

@@ -52,64 +52,27 @@ public class LightLda extends GibbsLda {
                 int newTopic = -1;
                 for (int mhStep = 0; mhStep < MH_STEPS; mhStep++) {
 
-                    // Doc-Proposal
+                    // Document-Proposal
                     int u = (int)(random.nextDouble() * sumPd);
                     newTopic = u < documents[document].length ? matZ[document][u] : random.nextInt(numTopics);
                     
                     if(topic != newTopic) {
-                        double tmpOld = (matDocTopic[document][topic] + alpha[topic])
-                                * (matTopicWord[topic][word] + beta[word]) / (vecTopic[topic] + betaSum);
-                        double propOld = matDocTopic[document][topic] + alpha[topic];
-                        if(topic == oldTopic) propOld += 1;
+                        double probabilityOfTopic = (matDocTopic[document][topic] + alpha[topic]);
+                        double probabilityOfWordInTopic = (matTopicWord[topic][word] + beta[word])
+                                / (vecTopic[topic] + betaSum);
+                        double proposalTopic = topic == oldTopic ? probabilityOfTopic + 1 : probabilityOfTopic;
 
-                        double tmpNew = (matDocTopic[document][newTopic] + alpha[newTopic])
-                                * (matTopicWord[newTopic][word] + beta[word]) / (vecTopic[newTopic] + betaSum);
-                        double propNew = matDocTopic[document][newTopic] + alpha[newTopic];
-                        if(newTopic == oldTopic) propNew += 1;
+                        double probabilityOfNewTopic = matDocTopic[document][newTopic] + alpha[newTopic];
+                        double probabilityOfWordInNewTopic = (matTopicWord[newTopic][word] + beta[word])
+                                / (vecTopic[newTopic] + betaSum);
+                        double proposalNewTopic = newTopic == oldTopic ? probabilityOfNewTopic + 1 : probabilityOfNewTopic;
 
-                        double acceptance = (tmpNew * propOld) / (tmpOld * propNew);
+                        double acceptance = (probabilityOfNewTopic * probabilityOfWordInNewTopic * proposalTopic) 
+                        / (probabilityOfTopic * probabilityOfWordInTopic * proposalNewTopic);
 
                         if(random.nextDouble() < acceptance) {
                             topic = newTopic;
                         }
-
-
-
-                        // double acceptance = 
-                        //         (matDocTopic[document][newTopic] + alpha[newTopic]) 
-                        //         * (matTopicWord[newTopic][word] + beta[word])
-                        //         * (vecTopic[topic] + betaSum)
-                        //         * (alpha[topic] + topic == oldTopic ? matDocTopic[document][topic] + 1 : matDocTopic[document][topic])
-                        //         / 
-                        //         (matDocTopic[document][topic] + alpha[topic]) 
-                        //         * (matTopicWord[topic][word] + beta[word])
-                        //         * (vecTopic[newTopic] + betaSum)
-                        //         * (alpha[newTopic] + topic == newTopic ? matDocTopic[document][newTopic] + 1 : matDocTopic[document][newTopic]);
-
-                        // if (random.nextDouble() < acceptance) {
-                        //     topic = newTopic;
-                        // }
-
-
-
-                        // double propOfTopic = (matDocTopic[document][topic] + alpha[topic]);
-                        // double propOfWordInTopic = (matTopicWord[topic][word] + beta[word])
-                        //         / (vecTopic[topic] + betaSum);
-
-                        // double propOfNewTopic = matDocTopic[document][newTopic] + alpha[newTopic];
-                        // double propOfWordInNewTopic = (matTopicWord[newTopic][word] + beta[word])
-                        //         / (vecTopic[newTopic] + betaSum);
-
-                        // double objectiveFunction = propOfNewTopic * propOfWordInNewTopic / propOfTopic * propOfWordInTopic;
-
-                        // double proposalTopic = topic == oldTopic ? propOfTopic + 1 : propOfTopic;
-                        // double proposalNewTopic = newTopic == oldTopic ? propOfNewTopic + 1 : propOfNewTopic;
-
-                        // double acceptance = objectiveFunction * proposalTopic / proposalNewTopic;
-
-                        // if(random.nextDouble() < acceptance) {
-                        //     topic = newTopic;
-                        // }
                     }
 
                     // Word-Proposal
@@ -120,70 +83,26 @@ public class LightLda extends GibbsLda {
                     newTopic = wordTable.sample(random);
 
                     if(topic != newTopic) {
-                        double tmpOld = (matDocTopic[document][topic] + alpha[topic])
-                                * (matTopicWord[topic][word] + beta[word]) / (vecTopic[topic] + betaSum);
-                        double tmpNew = (matDocTopic[document][newTopic] + alpha[newTopic])
-                                * (matTopicWord[newTopic][word] + beta[word]) / (vecTopic[newTopic] + betaSum);
+                        double probabilityOfTopic = (matDocTopic[document][topic] + alpha[topic]);
+                        double probabilityOfWordInTopic = (matTopicWord[topic][word] + beta[word])
+                                / (vecTopic[topic] + betaSum);
+                        double proposalTopic = topic == oldTopic
+                        ? probabilityOfWordInTopic + (1 / (vecTopic[topic] + betaSum))
+                        : probabilityOfWordInTopic;
 
-                        double acceptance = tmpNew * (wordTable.getUnnormalizedProbability()[topic] / alpha[topic])
-                                / tmpOld * (wordTable.getUnnormalizedProbability()[newTopic] / alpha[newTopic]);
+                        double probabilityOfNewTopic = matDocTopic[document][newTopic] + alpha[newTopic];
+                        double probabilityOfWordInNewTopic = (matTopicWord[newTopic][word] + beta[word])
+                                / (vecTopic[newTopic] + betaSum);
+                        double proposalNewTopic = newTopic == oldTopic
+                        ? probabilityOfWordInNewTopic + (1 / (vecTopic[newTopic] + betaSum))
+                        : probabilityOfWordInNewTopic;
 
-                        if(random.nextDouble() < acceptance) {
+                        double acceptance = (probabilityOfNewTopic * probabilityOfWordInNewTopic * proposalTopic)
+                                / (probabilityOfTopic * probabilityOfWordInTopic * proposalNewTopic);
+
+                        if (random.nextDouble() < acceptance) {
                             topic = newTopic;
                         }
-
-
-
-
-
-                        // double tmpOld = (matDocTopic[document][topic] + alpha[topic])
-                        //     * (matTopicWord[topic][word] + beta[word]) / (vecTopic[topic] + betaSum);
-                        // double tmpNew = (matDocTopic[document][newTopic] + alpha[newTopic])
-                        //     * (matTopicWord[newTopic][word] + beta[word]) / (vecTopic[newTopic] + betaSum);
-
-                        // double proposalTopic = topic == oldTopic
-                        // ? (matTopicWord[topic][word] + 1 + beta[word]) / (vecTopic[topic] + betaSum)
-                        // : (matTopicWord[topic][word] + beta[word]) / (vecTopic[topic] + betaSum);
-
-                        // double proposalNewTopic = newTopic == oldTopic
-                        // ? (matTopicWord[newTopic][word] + 1 + beta[word]) / (vecTopic[newTopic] + betaSum)
-                        // : (matTopicWord[newTopic][word] + beta[word]) / (vecTopic[newTopic] + betaSum);
-
-                        // double acceptance = tmpNew * proposalTopic
-                        // / tmpOld * proposalNewTopic;
-
-                        // if(random.nextDouble() < acceptance) {
-                        // topic = newTopic;
-                        // }
-
-
-
-
-
-                        // double propOfTopic = matDocTopic[document][topic] + alpha[topic];
-                        // double propOfWordInTopic = (matTopicWord[topic][word] + beta[word])
-                        //         / (vecTopic[topic] + betaSum);
-
-                        // double propOfNewTopic = matDocTopic[document][newTopic] + alpha[newTopic];
-                        // double propOfWordInNewTopic = (matTopicWord[newTopic][word] + beta[word])
-                        //         / (vecTopic[newTopic] + betaSum);
-
-                        // double objectiveFunction = propOfNewTopic * propOfWordInNewTopic / propOfTopic
-                        //         * propOfWordInTopic;
-                        
-                        // double proposalTopic = topic == oldTopic
-                        //         ? (matTopicWord[topic][word] + 1 + beta[word]) / (vecTopic[topic] + betaSum)
-                        //         : propOfTopic;
-
-                        // double proposalNewTopic = newTopic == oldTopic 
-                        //         ? (matTopicWord[newTopic][word] + 1 + beta[word]) / (vecTopic[newTopic] + betaSum)
-                        //         : propOfNewTopic;
-
-                        // double acceptance = objectiveFunction * proposalTopic / proposalNewTopic;
-
-                        // if (random.nextDouble() < acceptance) {
-                        //     topic = newTopic;
-                        // }
                     }
                 }
 
